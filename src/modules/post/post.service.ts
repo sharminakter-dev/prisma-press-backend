@@ -1,6 +1,9 @@
+import { title } from "node:process";
 import { CommentStatus, PostStatus } from "../../../generated/prisma/enums";
+import type { PostWhereInput } from "../../../generated/prisma/models";
 import { prisma } from "../../lib/prisma";
-import type { ICreatepostPayload, IUpdatePostPayload } from "./post.interface";
+import type { ICreatepostPayload, IPostQuery, IUpdatePostPayload } from "./post.interface";
+import { skip } from "node:test";
 
 const createPost = async(userId: string, payload: ICreatepostPayload)=>{
     const result = await prisma.post.create({
@@ -12,9 +15,129 @@ const createPost = async(userId: string, payload: ICreatepostPayload)=>{
     return result;
 };
 
-const getAllPosts = async()=>{
+
+const getAllPosts = async(query: IPostQuery)=>{
+
+    //* combining search (OR OPerator) and filtering (AND Operator)
+    // * pagination : page = 3, limit / take = 10 => skip : (page -1 ) * limit = (3-1) * 10 = 20
+    // * Sorting : orderBy
+
+    const limit = query.limit? Number(query.limit): 10;
+    const page = query.page? Number(query.page) : 1;
+    const skip = (page - 1)*limit;
+    const sortBy = query.sortBy ? query.sortBy : "createdAt";
+    const sortOrder = query.sortOrder ? query.sortOrder : "desc";
+
+    const tags = query.tags? JSON.parse(query.tags as string):[];
+
+    const tagsArray = Array.isArray(tags) ? tags: []
+
+    const andCondition : PostWhereInput[] = [];
+
+    // * Search Condition
+    if(query.searchTerm){
+        andCondition.push({
+            OR:[
+                {
+                    title : {
+                        contains : query.searchTerm,
+                        mode : "insensitive"
+                    },
+                },
+                {
+                        content : {
+                        contains : query.searchTerm,
+                        mode : "insensitive"
+                    }
+                }
+            ]
+        })
+    }
+
+    // * finter Condition
+    if(query.title){
+        andCondition.push({
+            title: query.title
+        })
+    }
+
+    if(query.content){
+        andCondition.push({
+            content: query.content
+        })
+    }
+
+    if(query.authorId){
+        andCondition.push({
+            authorId: query.authorId
+        })
+    }
+
+    if(query.isFeatured){
+        andCondition.push({
+            isFeatured: Boolean(query.isFeatured)
+        })
+    }
+
+    if(query.tags){
+        andCondition.push({
+            tags: {
+                hasSome : tagsArray
+            }
+        })
+    }
+
+    if(query.status){
+        andCondition.push({
+            status: query.status
+        })
+    }
+
     const posts =  await prisma.post.findMany(
         {
+
+            // * Search and filter
+            // where:{
+            //     AND:[
+            //         query.searchTerm?
+            //         {OR : [
+            //             {
+            //                 title : {
+            //                     contains : query.searchTerm,
+            //                     mode : "insensitive"
+            //                 },
+            //             },
+            //             {
+            //                  content : {
+            //                     contains : query.searchTerm,
+            //                     mode : "insensitive"
+            //                 }
+            //             }
+            //         ]} : {},
+
+            //         // title filtering
+            //         query.title? {title: query.content} : {},
+            //         query.tags? {
+            //             tags: {
+            //                 hasSome: [""]
+            //             }
+            //         } : {},
+            //     ]
+            // },
+
+            where: {
+                AND : andCondition
+            },
+
+            // * pagination
+            take: limit,
+            skip: skip,
+
+            // * sorting
+            orderBy :{
+                [sortBy] : sortOrder
+            },
+
             include: {
                 author: {
                     select:{
