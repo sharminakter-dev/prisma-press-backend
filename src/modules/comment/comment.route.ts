@@ -14,17 +14,17 @@ router.get("/author/:authorId", commentController.getCommentByAuthorId);
 
 router.get("/:commentId", commentController.getCommentByCommentId);
 
-router.patch("/:commnetId",
+router.patch("/:commentId",
     auth(Role.ADMIN, Role.AUTHOR, Role.USER),
     commentController.updateComment
 );
 
-router.delete("/:commnetId",
+router.delete("/:commentId",
     auth(Role.ADMIN, Role.AUTHOR, Role.USER),
     commentController.deleteComment
 );
 
-router.patch("/commnetId/moderate",
+router.patch("/:commentId/moderate",
     auth(Role.ADMIN),
     commentController.moderateComment
 );
