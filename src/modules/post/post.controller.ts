@@ -31,8 +31,9 @@ const getAllPosts = catchAsync( async(req: Request, res: Response)=>{
         success: true,
         statusCode: httpStatus.OK,
         message: "Posts Retrived Successfully.",
-        data: result
-    })
+        data: result.data,
+        meta: result.meta
+    });
 });
 
 const getPostStats = catchAsync( async(req: Request, res: Response)=>{
@@ -83,6 +84,7 @@ const getPostsById =  catchAsync( async(req: Request, res: Response)=>{
 });
 
 const updatePost =  catchAsync( async(req: Request, res: Response)=>{
+    const userId = req.user?.id;
     const authorId = req.user?.id;
     const isAdmin = req.user?.role === "ADMIN";
     
@@ -93,7 +95,7 @@ const updatePost =  catchAsync( async(req: Request, res: Response)=>{
         throw new Error("Post Id Required in Params.")
     }
 
-    const result = await postService.updatePost(postId as string, payload, authorId as string, isAdmin);
+    const result = await postService.updatePost(postId as string, userId as string, payload, authorId as string, isAdmin);
 
     sendResonse(res,{
         success: true,

@@ -1,11 +1,25 @@
 import { title } from "node:process";
-import { CommentStatus, PostStatus } from "../../../generated/prisma/enums";
+import { CommentStatus, PostStatus, SubscriptionStatus } from "../../../generated/prisma/enums";
 import type { PostWhereInput } from "../../../generated/prisma/models";
 import { prisma } from "../../lib/prisma";
 import type { ICreatepostPayload, IPostQuery, IUpdatePostPayload } from "./post.interface";
 import { skip } from "node:test";
 
 const createPost = async(userId: string, payload: ICreatepostPayload)=>{
+
+    const user = await prisma.user.findUniqueOrThrow({
+        where: {
+            id: userId
+        },
+        include: {
+            subscription: true,
+        }
+    });
+
+    if(payload.isPremium && user.subscription?.status !== SubscriptionStatus.ACTIVE){
+        throw new Error("You Are Not a Premium User.");
+    }
+
     const result = await prisma.post.create({
         data: {
             ...payload,
@@ -93,6 +107,11 @@ const getAllPosts = async(query: IPostQuery)=>{
         })
     }
 
+    // * filter nonPremium Posts
+    andCondition.push({
+        isPremium: false
+    });
+
     const posts =  await prisma.post.findMany(
         {
 
@@ -150,7 +169,22 @@ const getAllPosts = async(query: IPostQuery)=>{
         }
     );
 
-    return posts;
+    const totalPostCount = await prisma.post.count({
+        where:{
+            AND : andCondition
+        }
+    });
+
+    return {
+        data: posts,
+        meta: {
+            page: page,
+            limit: limit,
+            total: totalPostCount,
+            totalPages: Math.ceil(totalPostCount / limit)
+
+        }
+    };
 };
 
 const getPostById = async(postId: string)=>{
@@ -235,7 +269,8 @@ const getPostById = async(postId: string)=>{
 
             const post = await tx.post.findUniqueOrThrow({
                 where:{
-                    id: postId
+                    id: postId,
+                    isPremium: false
                 },
                 include:{
                     author:{
@@ -429,6 +464,7 @@ const getMypost = async(authorId: string)=>{
 
 const updatePost = async(
     postId: string, 
+    userId: string,
     payload: IUpdatePostPayload, 
     authorId : string,
     isAdmin: boolean
@@ -441,6 +477,19 @@ const updatePost = async(
 
     if(!isAdmin && post.authorId !== authorId){
         throw new Error("You Dont Have Permission To Update This Post");
+    }
+
+    const user = await prisma.user.findUniqueOrThrow({
+        where: {
+            id: userId
+        },
+        include: {
+            subscription: true,
+        }
+    });
+
+    if(payload.isPremium && user.subscription?.status !== SubscriptionStatus.ACTIVE){
+        throw new Error("You Are Not a Premium User.");
     }
 
     const result = await prisma.post.update({

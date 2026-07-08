@@ -9,6 +9,7 @@ model User {
   updatedAt    DateTime     @default(now())
 
   profile Profile?
+  subscription Subscription?
 
   comments Comment[]
   posts    Post[]
